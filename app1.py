@@ -48,8 +48,7 @@ def load_data():
         df['Hour'] = df['Order_Time'].dt.hour
         df['Day_of_Week'] = df['Order_Time'].dt.day_name()
 
-        # 4. Financial Calculations (CORRECTED)
-        # Revenue must be Price * Quantity
+        # 4. Financial Calculations
         df['Total_Spend'] = df['Price'] * df['Quantity']
 
         return df
@@ -68,28 +67,45 @@ if df.empty:
 # ==========================================
 st.sidebar.header("🔍 Filter Dashboard")
 
+def create_filter(label, column_name):
+    """Helper to create a Select All checkbox + Multiselect"""
+    options = sorted(df[column_name].dropna().unique())
+    
+    # Checkbox for Select All
+    all_selected = st.sidebar.checkbox(f"Select All {label}s", value=True, key=f"all_{column_name}")
+    
+    if all_selected:
+        selected_values = options
+        # Disable the multiselect to avoid confusion, or just hide it (logic implies hiding isn't necessary if we just overwrite)
+        # Showing it disabled gives visual feedback of what is selected
+        st.sidebar.multiselect(f"Select {label}:", options, default=options, disabled=True, key=f"multi_{column_name}_disabled")
+    else:
+        selected_values = st.sidebar.multiselect(f"Select {label}:", options, default=options[:1], key=f"multi_{column_name}")
+        
+    return selected_values
+
 # A. City Filter
-city_options = sorted(df['City'].unique())
-selected_cities = st.sidebar.multiselect("Select City:", city_options, default=city_options)
+selected_cities = create_filter("City", "City")
 
 # B. Category Filter
-cat_options = sorted(df['Product_Category'].unique())
-selected_cats = st.sidebar.multiselect("Select Category:", cat_options, default=cat_options)
+selected_cats = create_filter("Category", "Product_Category")
 
 # C. Age Group Filter
-age_options = sorted(df['Age_Group'].dropna().unique())
-selected_ages = st.sidebar.multiselect("Select Age Group:", age_options, default=age_options)
+selected_ages = create_filter("Age Group", "Age_Group")
+
+# D. Gender Filter (New)
+selected_genders = create_filter("Gender", "Gender")
 
 # Apply Filters
 df_filtered = df[
     (df['City'].isin(selected_cities)) & 
     (df['Product_Category'].isin(selected_cats)) &
-    (df['Age_Group'].isin(selected_ages))
+    (df['Age_Group'].isin(selected_ages)) &
+    (df['Gender'].isin(selected_genders))
 ]
 
 st.sidebar.markdown("---")
 st.sidebar.info(f"**Data Points:** {len(df_filtered)}")
-st.sidebar.caption("Use these filters to drill down into specific cities or demographics.")
 
 # ==========================================
 # 4. KPI ROW
@@ -108,7 +124,7 @@ if not df_filtered.empty:
     col3.metric("⏱️ Avg Delivery Time", f"{avg_delivery:.1f} min")
     col4.metric("📦 Avg Basket Size", f"{avg_basket_size:.1f} items")
 else:
-    st.warning("No data matches your filters.")
+    st.warning("No data matches your filters. Please check your selection.")
     st.stop()
 
 st.markdown("---")
@@ -116,7 +132,7 @@ st.markdown("---")
 # ==========================================
 # 5. MAIN TABS
 # ==========================================
-tab1, tab2, tab3 = st.tabs(["📦 Delivery Crisis", "👥 Customer Segments", "💔 Loyalty Analysis"])
+tab1, tab2, tab3, tab4 = st.tabs(["📦 Delivery Crisis", "👥 Customer Segments", "💔 Loyalty Analysis", "📈 General Analysis"])
 
 # --- TAB 1: DELIVERY OPTIMIZATION ---
 with tab1:
@@ -208,7 +224,6 @@ with tab3:
     with c6:
         # 2. Correlation Matrix (Using Total_Spend)
         st.markdown("**Correlation Matrix**")
-        # Swapped 'Price' for 'Total_Spend' to check actual value correlation
         numeric_df = df_filtered[['Total_Spend', 'Quantity', 'Delivery_Time_mins', 'Loyalty_Points_Earned', 'Age']]
         corr = numeric_df.corr()
         
@@ -217,6 +232,75 @@ with tab3:
         st.pyplot(fig_corr)
     
     st.error("⚠️ **Critical Issue:** The correlation between Total Spend and Loyalty Points is ~0.00. Customers spending ₹1000 are getting the same points as those spending ₹100. The loyalty program is essentially random.")
+
+# --- TAB 4: GENERAL ANALYSIS (New) ---
+with tab4:
+    st.subheader("📈 Custom Data Exploration")
+    st.markdown("Use the controls below to generate your own charts using the filtered data.")
+    
+    # 1. Controls
+    c_gen1, c_gen2, c_gen3, c_gen4 = st.columns(4)
+    
+    # Filter out high-cardinality columns for better UX
+    cols = [c for c in df.columns if c not in ['Customer_ID', 'Product_ID', 'Order_Time']]
+    
+    with c_gen1:
+        x_col = st.selectbox("Select X-Axis", cols, index=cols.index('Age') if 'Age' in cols else 0)
+    with c_gen2:
+        y_col = st.selectbox("Select Y-Axis", cols, index=cols.index('Total_Spend') if 'Total_Spend' in cols else 1)
+    with c_gen3:
+        color_col = st.selectbox("Color By (Optional)", [None] + cols, index=0)
+    with c_gen4:
+        chart_type = st.selectbox("Chart Type", ["Scatter", "Bar", "Line", "Histogram", "Box", "Violin"])
+
+    # 2. Aggregation Logic for Bar/Line
+    agg_func = None
+    if chart_type in ["Bar", "Line"]:
+        st.markdown("**Aggregation Settings** (Recommended for Bar/Line charts with categorical X-axis)")
+        use_agg = st.checkbox("Aggregate Data?", value=True)
+        if use_agg:
+            agg_method = st.selectbox("Aggregation Method", ["Sum", "Average", "Count"])
+            if agg_method == "Sum":
+                agg_func = 'sum'
+            elif agg_method == "Average":
+                agg_func = 'mean'
+            elif agg_method == "Count":
+                agg_func = 'count'
+
+    # 3. Plotting
+    try:
+        if agg_func:
+            # Perform aggregation
+            if color_col:
+                grouped_df = df_filtered.groupby([x_col, color_col])[y_col].agg(agg_func).reset_index()
+            else:
+                grouped_df = df_filtered.groupby(x_col)[y_col].agg(agg_func).reset_index()
+            
+            data_to_plot = grouped_df
+            title = f"{y_col} ({agg_method}) by {x_col}"
+        else:
+            data_to_plot = df_filtered
+            title = f"{y_col} vs {x_col}"
+
+        # Generate Charts
+        if chart_type == "Scatter":
+            fig = px.scatter(data_to_plot, x=x_col, y=y_col, color=color_col, title=title)
+        elif chart_type == "Bar":
+            fig = px.bar(data_to_plot, x=x_col, y=y_col, color=color_col, title=title)
+        elif chart_type == "Line":
+            fig = px.line(data_to_plot, x=x_col, y=y_col, color=color_col, title=title, markers=True)
+        elif chart_type == "Histogram":
+            fig = px.histogram(data_to_plot, x=x_col, color=color_col, title=f"Distribution of {x_col}")
+        elif chart_type == "Box":
+            fig = px.box(data_to_plot, x=x_col, y=y_col, color=color_col, title=title)
+        elif chart_type == "Violin":
+            fig = px.violin(data_to_plot, x=x_col, y=y_col, color=color_col, box=True, title=title)
+            
+        st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Could not plot chart. Error: {e}")
+        st.info("Tip: Ensure you are not trying to aggregate a text column with Sum/Average, or plot text on a numerical axis.")
 
 # Footer
 st.markdown("---")
