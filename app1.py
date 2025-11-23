@@ -304,5 +304,6 @@ with tab4:
 
 # Footer
 st.markdown("---")
-st.caption("Zepto Strategic Analysis | Datzoids")
+st.caption("Zepto Strategic Analysis | Datazoids")
+
 
