@@ -152,7 +152,7 @@ with tab1:
             labels={'SLA_Breach': 'Breach % (>10 mins)'}
         )
         fig_city.add_hline(y=10, line_dash="dot", annotation_text="Target Limit", annotation_position="bottom right")
-        st.plotly_chart(fig_city, use_container_width=True)
+        st.plotly_chart(fig_city, width='stretch')
         
         with st.expander("💡 Insight: Systemic Failure"):
             st.write("The breach rate is consistently high (>40%) across ALL cities. This indicates a fundamental process flaw (e.g., store radius too large) rather than isolated traffic issues.")
@@ -165,7 +165,7 @@ with tab1:
             color='Quantity',
             color_discrete_sequence=px.colors.sequential.Viridis
         )
-        st.plotly_chart(fig_box, use_container_width=True)
+        st.plotly_chart(fig_box, width='stretch')
         
         with st.expander("💡 Insight: Quantity ≠ Delay"):
             st.write("There is **zero correlation** between basket size and delivery time. Riders take the same time to deliver 1 item as 5 items. **Recommendation:** Implement order batching (multiple orders per rider) to improve efficiency without increasing time per drop.")
@@ -186,7 +186,7 @@ with tab2:
             color='Total_Spend', color_continuous_scale='Teal',
             labels={'Total_Spend': 'Total Revenue (INR)'}
         )
-        st.plotly_chart(fig_age, use_container_width=True)
+        st.plotly_chart(fig_age, width='stretch')
         
         with st.expander("💡 Insight: The 56-65 Surprise"):
             st.write("Contrary to popular belief, the **56-65 Age Group** is the highest spending demographic. The 18-25 (Gen Z) group spends the least. Marketing should pivot to target seniors.")
@@ -219,7 +219,7 @@ with tab3:
             labels={'Total_Spend': 'Total Transaction Value (INR)'},
             opacity=0.6
         )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        st.plotly_chart(fig_scatter, width='stretch')
 
     with c6:
         # 2. Correlation Matrix (Using Total_Spend)
@@ -296,7 +296,7 @@ with tab4:
         elif chart_type == "Violin":
             fig = px.violin(data_to_plot, x=x_col, y=y_col, color=color_col, box=True, title=title)
             
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
     except Exception as e:
         st.error(f"Could not plot chart. Error: {e}")
@@ -305,6 +305,7 @@ with tab4:
 # Footer
 st.markdown("---")
 st.caption("Zepto Strategic Analysis | Datazoids")
+
 
 
 
